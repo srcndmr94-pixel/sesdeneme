@@ -1,0 +1,64 @@
+name: APK derle
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'sesdeneme-proje.zip'
+      - '.github/workflows/apk.yml'
+
+jobs:
+  derle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Depoyu al
+        uses: actions/checkout@v4
+
+      - name: Projeyi zipten cikar
+        run: |
+          if [ -f sesdeneme-proje.zip ]; then
+            rm -rf _proje && mkdir _proje
+            unzip -q sesdeneme-proje.zip -d _proje
+            if [ ! -f _proje/settings.gradle ]; then
+              ic=$(find _proje -maxdepth 2 -name settings.gradle | head -1)
+              [ -n "$ic" ] && mv "$(dirname "$ic")" _proje_ic && rm -rf _proje && mv _proje_ic _proje
+            fi
+          else
+            echo "::error::Depo kokunde sesdeneme-proje.zip bulunamadi. Zip'i yukleyip tekrar calistir."
+            exit 1
+          fi
+          echo "--- proje icerigi"
+          find _proje -maxdepth 3 -type f | head -30
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: assembleDebug
+        working-directory: _proje
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: APK'yi bul
+        id: bul
+        run: |
+          apk=$(find _proje -name '*.apk' | head -1)
+          echo "APK: $apk"
+          ls -la "$apk"
+          echo "yol=$apk" >> "$GITHUB_OUTPUT"
+
+      - name: APK'yi yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameLingo-SesDeneme-APK
+          path: ${{ steps.bul.outputs.yol }}
+          if-no-files-found: error
